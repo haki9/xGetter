@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Base64;
+import android.util.Log;
 import android.util.SparseArray;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
@@ -97,6 +98,9 @@ public class XGetter {
     private final String uptostream = "https?:\\/\\/(www\\.)?(uptostream|uptobox)\\.[^\\/,^\\.]{2,}.+";
     private final String fansubs = "https?:\\/\\/(www\\.)?(fansubs\\.tv)\\/(v|watch)\\/.+";
     private final String fembed = "https?:\\/\\/(www\\.)?(fembed|vcdn)\\.[^\\/,^\\.]{2,}\\/(v|f)\\/.+";
+    private final String feurl = "https?:\\/\\/(www\\.)?(feurl)\\.[^\\/,^\\.]{2,}\\/(v|f)\\/.+";
+    private final String playembed = "https?:\\/\\/(www\\.)?(playembed)\\.[^\\/,^\\.]{2,}\\/(v|f)\\/.+";
+
     private final String verystream = "https?:\\/\\/(www\\.)?(woof|verystream)\\.[^\\/,^\\.]{2,}\\/(e|stream)\\/.+";
 
     //  https://uptobox.com/eyrasguzy8lk
@@ -156,7 +160,7 @@ public class XGetter {
         init();
         boolean fb = false;
         boolean run = false;
-        boolean mfire = false, oload = false,isOkRu = false,isVk=false,isRapidVideo=false,tw=false,gdrive=false,fruit=false,yt=false,solidf=false,isvidoza=false,isuptostream=false,isFanSubs=false,isMP4Uload=false,isSendVid = false,isFembed=false,isVeryStream = false,isFileRio=false,isDailyMotion=false;
+        boolean mfire = false, oload = false,isOkRu = false,isVk=false,isRapidVideo=false,tw=false,gdrive=false,fruit=false,yt=false,solidf=false,isvidoza=false,isuptostream=false,isFanSubs=false,isMP4Uload=false,isSendVid = false,isFembed=false,isVeryStream = false,isFileRio=false,isDailyMotion=false,isFeurl=false,isPlayembed=false;
         if (check(openload, url)) {
             //Openload
             run = true;
@@ -244,9 +248,9 @@ public class XGetter {
             run = true;
             solidf = true;
         } else if (check(vidoza, url)) {
-        //Vidoza
-        isvidoza=true;
-        run = true;
+            //Vidoza
+            isvidoza=true;
+            run = true;
         }else if (check(uptostream, url)) {
             //uptostream, uptobox
             isuptostream=true;
@@ -257,7 +261,16 @@ public class XGetter {
         }else if (check(fembed,url)){
             isFembed = true;
             run = true;
-        }else if (check(verystream,url)){
+        }
+        else if (check(feurl,url)){
+            isFeurl = true;
+            run = true;
+        }
+        else if (check(playembed,url)){
+            isPlayembed = true;
+            run = true;
+        }
+        else if (check(verystream,url)){
             isVeryStream = true;
             run = true;
         }else if (check(filerio,url)){
@@ -319,7 +332,13 @@ public class XGetter {
                 sendvid(url);
             } else if (isFembed){
                 fEmbed(url);
-            } else if (isVeryStream){
+            }
+            else if (isFeurl){
+                feurl(url);
+            }
+            else if (isPlayembed){
+                playEmbed(url);
+            }else if (isVeryStream){
                 verystream(url);
             } else if (isFileRio){
                 sendvid(url);
@@ -448,10 +467,12 @@ public class XGetter {
     }
 
     private void youtube(String url){
+        Log.d("hehe", "youtube: " + url);
         if (check(youtube,url)) {
             new YouTubeExtractor(context) {
                 @Override
                 public void onExtractionComplete(SparseArray<YtFile> ytFiles, VideoMeta vMeta) {
+                    Log.d("hehe", "onExtractionComplete: " + ytFiles);
                     if (ytFiles != null) {
                         ArrayList<XModel> xModels = new ArrayList<>();
 
@@ -463,12 +484,15 @@ public class XGetter {
                             }
                         }
 
+                        Log.d("hehe", "onExtractionComplete: ");
+
                         onComplete.onTaskCompleted(sortMe(xModels), true);
                     }else {
+                        Log.d("hehe", "error: ");
                         onComplete.onError();
                     }
                 }
-            }.extract(url, true, false);
+            }.extract("http://youtube.com/watch?v=UAd9AvDL_TU", true, true);
         }else onComplete.onError();
     }
 
@@ -594,7 +618,6 @@ public class XGetter {
 
     private void okru(String url) {
         if (url != null) {
-
             AndroidNetworking.get(url)
                     .addHeaders("User-agent", "Mozilla/5.0 (Linux; Android 4.1.1; Galaxy Nexus Build/JRO03C) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Mobile Safari/535.19")
                     .build()
@@ -602,10 +625,14 @@ public class XGetter {
                         @Override
                         public void onResponse(String response) {
                             String json = getJson(response);
+
                             if (json!=null) {
                                 json = StringEscapeUtils.unescapeHtml4(json);
                                 try {
+                                    Log.d("hehehe", "onResponse: " + new JSONObject(json));
+
                                     json = new JSONObject(json).getJSONObject("flashvars").getString("metadata");
+//                                    Log.d("hehehe", "onResponse: " + json);
                                     if (json!=null) {
                                         JSONArray jsonArray = new JSONObject(json).getJSONArray("videos");
                                         ArrayList<XModel> models = new ArrayList<>();
@@ -903,6 +930,54 @@ public class XGetter {
         String id = Fembed.get_fEmbed_video_ID(url);
         if (id!=null){
             AndroidNetworking.post("https://www.fembed.com/api/source/"+id)
+                    .build()
+                    .getAsString(new StringRequestListener() {
+                        @Override
+                        public void onResponse(String response) {
+                            ArrayList<XModel> xModels = Fembed.fetch(response);
+                            if (xModels!=null){
+                                onComplete.onTaskCompleted(sortMe(xModels),true);
+                            }else onComplete.onError();
+                        }
+
+                        @Override
+                        public void onError(ANError anError) {
+                            onComplete.onError();
+                        }
+                    });
+        }else onComplete.onError();
+    }
+
+    private void feurl(String url){
+        Log.d("heheh", "feurl: "  + url);
+        String id = Fembed.get_fEmbed_video_ID(url);
+        Log.d("hehe", "feurl: " + id);
+        if (id!=null){
+            AndroidNetworking.post("https://feurl.com/api/source/"+id)
+                    .build()
+                    .getAsString(new StringRequestListener() {
+                        @Override
+                        public void onResponse(String response) {
+                            Log.d("hehe", "onResponse: " +response);
+                            ArrayList<XModel> xModels = Fembed.fetch(response);
+                            if (xModels!=null){
+                                onComplete.onTaskCompleted(sortMe(xModels),true);
+                            }else onComplete.onError();
+                        }
+
+                        @Override
+                        public void onError(ANError anError) {
+                            Log.d("hehe", "onError: " + anError);
+                            onComplete.onError();
+                        }
+                    });
+        }else onComplete.onError();
+    }
+
+    private void playEmbed(String url){
+        String id = Fembed.get_fEmbed_video_ID(url);
+        if (id!=null){
+            AndroidNetworking.post("https://www.playembed.com/api/source/"+id)
                     .build()
                     .getAsString(new StringRequestListener() {
                         @Override
